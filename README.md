@@ -121,7 +121,19 @@ Django terhubung ke PostgreSQL melalui environment variables yang didefinisikan 
 PostgreSQL menggunakan volume untuk menyimpan data agar tidak hilang saat container dihentikan.
 
 ---
+## Query Optimization
 
+### N+1 Problem
+Query tanpa optimization menyebabkan banyak query ke database.
+
+### Optimized Query
+Menggunakan select_related mengurangi jumlah query secara signifikan.
+
+### Hasil Perbandingan
+
+![Query Comparison](images/query.png)
+
+---
 # Author
 
 Nafis Aljufri
