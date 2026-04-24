@@ -133,6 +133,12 @@ Menggunakan select_related mengurangi jumlah query secara signifikan.
 
 ![Query Comparison](images/query.png)
 
+## API Documentation
+
+Swagger UI tersedia di `http://localhost:8000/api/docs`
+
+![Swagger UI](img/swagger.png)
+
 ---
 # Author
 
