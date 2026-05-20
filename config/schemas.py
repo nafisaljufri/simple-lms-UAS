@@ -1,6 +1,8 @@
-from ninja import Schema
+from ninja import Schema, FilterSchema, Field
 from typing import List
+from typing import Optional
 from pydantic import validator
+from django.db.models import Q
 
 # ======================
 # USER
@@ -109,3 +111,18 @@ class ProgressIn(Schema):
         if v <= 0:
             raise ValueError("Lesson ID tidak valid")
         return v
+    
+class CourseUpdateSchema(Schema):
+    title: Optional[str] = None
+    description: Optional[str] = None
+
+class CourseFilter(FilterSchema):
+    search: Optional[str] = Field(
+        None,
+        q=['title__icontains', 'description__icontains']
+    )
+
+    def filter_search(self, value: str) -> Q:
+        if value:
+            return Q(title__icontains=value) | Q(description__icontains=value)
+        return Q()

@@ -1,21 +1,29 @@
-from ninja import NinjaAPI
+from ninja import NinjaAPI, File, Query, Schema
+from ninja.files import UploadedFile
+from ninja.pagination import paginate, PageNumberPagination
 from ninja_simple_jwt.auth.views.api import mobile_auth_router
 from ninja_simple_jwt.auth.ninja_auth import HttpJwtAuth
 from ninja.errors import HttpError
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
+from django.http import FileResponse
 from lms.models import Enrollment, Course, Lesson, Progress
 from .schemas import (
-    CourseIn, EnrollmentIn, ProgressIn,
+    CourseIn, CourseUpdateSchema, CourseFilter,
+    EnrollmentIn, ProgressIn,
     RegisterSchema, UpdateProfileSchema
 )
+from typing import List
 
 api = NinjaAPI()
 apiAuth = HttpJwtAuth()
 User = get_user_model()
 
-# Register auth router dari ninja-simple-jwt
-# Menyediakan: POST /auth/sign-in dan POST /auth/token-refresh
+class CourseOut(Schema):
+    id: int
+    title: str
+    description: str
+
 api.add_router("/auth/", mobile_auth_router)
 
 # ======================
@@ -51,34 +59,29 @@ def register(request, data: RegisterSchema):
 @api.get("/auth/me", auth=apiAuth)
 def get_me(request):
     user = User.objects.get(pk=request.user.id)
-    return success_response({
-        "id": user.id,
-        "username": user.username,
-        "role": user.role
-    }, "User data")
+    return success_response({"id": user.id, "username": user.username, "role": user.role}, "User data")
 
 @api.put("/auth/me", auth=apiAuth)
 def update_profile(request, data: UpdateProfileSchema):
     user = User.objects.get(pk=request.user.id)
     user.username = data.username
     user.save()
-    return success_response({
-        "id": user.id,
-        "username": user.username,
-        "role": user.role
-    }, "Profile updated")
+    return success_response({"id": user.id, "username": user.username, "role": user.role}, "Profile updated")
 
 # ======================
 # COURSES
 # ======================
-@api.get("/courses")
-def list_courses(request, page: int = 1, limit: int = 10, search: str = ""):
+
+@api.get("/courses", response=List[CourseOut])
+@paginate(PageNumberPagination, page_size=10)
+def list_courses(request, filters: CourseFilter = Query(...), ordering: str = '-id'):
+    allowed_fields = ['title', '-title', 'id', '-id', 'description', '-description']
+    if ordering not in allowed_fields:
+        ordering = '-id'
     qs = Course.objects.all()
-    if search:
-        qs = qs.filter(title__icontains=search)
-    total = qs.count()
-    courses = list(qs[(page-1)*limit : page*limit].values("id", "title", "description"))
-    return success_response({"total": total, "page": page, "results": courses})
+    qs = filters.filter(qs)
+    qs = qs.order_by(ordering)
+    return qs
 
 @api.get("/courses/{course_id}")
 def course_detail(request, course_id: int):
@@ -102,13 +105,13 @@ def create_course(request, data: CourseIn):
     return api.create_response(request, success_response({"id": course.id}, "Course created"), status=201)
 
 @api.patch("/courses/{course_id}", auth=apiAuth)
-def update_course(request, course_id: int, data: CourseIn):
+def update_course(request, course_id: int, data: CourseUpdateSchema):
     user = User.objects.get(pk=request.user.id)
     course = get_object_or_404(Course, id=course_id)
     if course.instructor != user:
         raise HttpError(403, "Hanya pemilik course yang bisa mengedit")
-    course.title = data.title
-    course.description = data.description
+    for attr, value in data.dict(exclude_unset=True).items():
+        setattr(course, attr, value)
     course.save()
     return success_response(None, "Course updated")
 
@@ -120,6 +123,59 @@ def delete_course(request, course_id: int):
         raise HttpError(403, "Hanya admin atau pemilik course yang bisa menghapus")
     course.delete()
     return success_response(None, "Course deleted")
+
+@api.post("/courses/{course_id}/upload-image", auth=apiAuth)
+def upload_course_image(request, course_id: int, file: UploadedFile = File(...)):
+    user = User.objects.get(pk=request.user.id)
+    course = get_object_or_404(Course, id=course_id)
+    if course.instructor != user:
+        raise HttpError(403, "Hanya pemilik course yang bisa upload image")
+    if file.size > 2 * 1024 * 1024:
+        raise HttpError(400, "Ukuran file maksimal 2MB")
+    allowed_types = ['image/jpeg', 'image/png', 'image/webp']
+    if file.content_type not in allowed_types:
+        raise HttpError(400, "Tipe file harus JPEG, PNG, atau WebP")
+    course.image = file
+    course.save()
+    return success_response({"filename": file.name}, "Image berhasil diupload")
+
+# ======================
+# LESSONS (upload & download)
+# ======================
+@api.post("/lessons/{lesson_id}/upload-attachment", auth=apiAuth)
+def upload_attachment(request, lesson_id: int, file: UploadedFile = File(...)):
+    user = User.objects.get(pk=request.user.id)
+    lesson = get_object_or_404(Lesson, id=lesson_id)
+    if lesson.course.instructor != user:
+        raise HttpError(403, "Hanya pemilik course yang bisa upload attachment")
+    if file.size > 10 * 1024 * 1024:
+        raise HttpError(400, "Ukuran file maksimal 10MB")
+    allowed_types = [
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'application/zip'
+    ]
+    if file.content_type not in allowed_types:
+        raise HttpError(400, "Tipe file harus PDF, DOCX, PPTX, atau ZIP")
+    lesson.file_attachment = file
+    lesson.save()
+    return success_response({"filename": file.name}, "Attachment berhasil diupload")
+
+@api.get("/lessons/{lesson_id}/download", auth=apiAuth)
+def download_attachment(request, lesson_id: int):
+    user = User.objects.get(pk=request.user.id)
+    lesson = get_object_or_404(Lesson, id=lesson_id)
+    is_member = Enrollment.objects.filter(student=user, course=lesson.course).exists()
+    if not is_member:
+        raise HttpError(403, "Anda harus terdaftar di course ini untuk mendownload")
+    if not lesson.file_attachment:
+        raise HttpError(404, "Lesson ini tidak memiliki file attachment")
+    return FileResponse(
+        lesson.file_attachment.open(),
+        as_attachment=True,
+        filename=lesson.file_attachment.name.split('/')[-1]
+    )
 
 # ======================
 # ENROLLMENT

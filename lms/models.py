@@ -36,7 +36,7 @@ class CourseQuerySet(models.QuerySet):
 class Course(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField()
-
+    image = models.ImageField(upload_to='courses/', null=True, blank=True)
     instructor = models.ForeignKey(User, on_delete=models.CASCADE)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True)
 
@@ -54,6 +54,7 @@ class Lesson(models.Model):
     title = models.CharField(max_length=200)
     content = models.TextField()
     order = models.IntegerField()
+    file_attachment = models.FileField(upload_to='attachments/', null=True, blank=True)
 
     class Meta:
         ordering = ['order']
