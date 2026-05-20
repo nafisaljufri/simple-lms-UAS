@@ -1,15 +1,16 @@
-# Simple LMS - Django Docker Project
+# Simple LMS - Django REST API Project
 
-Project ini merupakan implementasi dasar Learning Management System (LMS) menggunakan Django dengan PostgreSQL sebagai database, yang dijalankan menggunakan Docker.
+Project ini merupakan implementasi Learning Management System (LMS) menggunakan Django Ninja dengan JWT Authentication dan Role-Based Access Control (RBAC), dijalankan menggunakan Docker.
 
 ---
 
 # Teknologi yang Digunakan
 
-* Docker
-* Docker Compose
-* Django
+* Docker & Docker Compose
+* Django + Django Ninja
 * PostgreSQL
+* ninja-simple-jwt (JWT Authentication)
+* Pydantic Schema Validation
 
 ---
 
@@ -22,54 +23,72 @@ simple-lms/
 ├── .env
 ├── requirements.txt
 ├── manage.py
+├── jwt-signing.pub
 ├── config/
 │   ├── settings.py
 │   ├── urls.py
+│   ├── apiv1.py
+│   ├── schemas.py
+│   ├── permissions.py
+│   ├── helpers.py
 │   └── wsgi.py
-└── README.md
+├── lms/
+│   ├── models.py
+│   ├── admin.py
+│   └── migrations/
+├── postman/
+│   └── simple-lms.postman_collection.json
+└── img/
+    └── swagger.png
 ```
+
 ![Structure](img/struktur.png)
+
 ---
 
 # Cara Menjalankan Project
 
 ## 1. Masuk ke Folder Project
 
-```
+```bash
 cd simple-lms
 ```
 
----
-
 ## 2. Jalankan Docker
 
-```
+```bash
 docker compose up -d
 ```
+
 ![Docker Compose](img/docker-compose.png)
----
 
 ## 3. Jalankan Migration
 
-```
+```bash
 docker compose exec web python manage.py migrate
 ```
+
 ![Docker Migrate](img/migration.png)
----
 
-## 4. Akses Aplikasi
+## 4. Generate RSA Keys (JWT)
 
-Buka browser dan akses:
+```bash
+docker compose exec web python manage.py make_rsa
+```
+
+## 5. Akses API Documentation
+
+Buka browser dan akses Swagger UI:
 
 ```
-http://localhost:8000
+http://localhost:8000/api/docs
 ```
 
 ---
 
 # Konfigurasi Environment Variables
 
-File `.env` digunakan untuk menyimpan konfigurasi database:
+File `.env` digunakan untuk menyimpan konfigurasi:
 
 ```
 DEBUG=True
@@ -80,66 +99,122 @@ DB_PASSWORD=postgres
 DB_HOST=db
 DB_PORT=5432
 ```
-![Django Database](img/env.png)
----
 
-# Screenshot
-
-## 1. Django Welcome Page
-
-![Django Welcome](img/django.png)
-
-## 2. Docker Container Running
-
-![Docker PS](img/docker-ps.png)
+![ENV](img/env.png)
 
 ---
 
-# Testing & Verification
+# API Endpoints
 
-| Komponen       | Status    |
-| -------------- | --------- |
-| Django App     | Running   |
-| PostgreSQL     | Connected |
-| Docker Compose | Working   |
+## Authentication
+
+| Method | Endpoint | Deskripsi | Auth |
+|--------|----------|-----------|------|
+| POST | `/api/auth/register` | Register user baru | ❌ |
+| POST | `/api/auth/sign-in` | Login & dapat JWT token | ❌ |
+| POST | `/api/auth/token-refresh` | Refresh access token | ❌ |
+| GET | `/api/auth/me` | Get profil user login | ✅ |
+| PUT | `/api/auth/me` | Update profil user | ✅ |
+
+## Courses
+
+| Method | Endpoint | Deskripsi | Role |
+|--------|----------|-----------|------|
+| GET | `/api/courses` | List semua course (pagination & filter) | Public |
+| GET | `/api/courses/{id}` | Detail course | Public |
+| POST | `/api/courses` | Buat course baru | Instructor |
+| PATCH | `/api/courses/{id}` | Update course | Owner |
+| DELETE | `/api/courses/{id}` | Hapus course | Admin/Owner |
+
+## Enrollments
+
+| Method | Endpoint | Deskripsi | Role |
+|--------|----------|-----------|------|
+| POST | `/api/enrollments` | Enroll ke course | Student |
+| GET | `/api/enrollments/my-courses` | Daftar course saya | Student |
+| POST | `/api/enrollments/{id}/progress` | Tandai lesson selesai | Student |
 
 ---
 
-# Penjelasan Konfigurasi
+# JWT Authentication
 
-## 1. Docker Compose
+Project ini menggunakan `ninja-simple-jwt` dengan RSA key pair.
 
-* **web** → menjalankan aplikasi Django
-* **db** → PostgreSQL database
+### Cara Login
 
-## 2. Database Connection
+```json
+POST /api/auth/sign-in
+{
+  "username": "student1",
+  "password": "password123"
+}
+```
 
-Django terhubung ke PostgreSQL melalui environment variables yang didefinisikan di file `.env`.
+### Response
 
-## 3. Volume
+```json
+{
+  "access": "eyJhbGci...",
+  "refresh": "eyJhbGci..."
+}
+```
 
-PostgreSQL menggunakan volume untuk menyimpan data agar tidak hilang saat container dihentikan.
+### Menggunakan Token
+
+Sertakan access token di header setiap request ke protected endpoint:
+
+```
+Authorization: Bearer eyJhbGci...
+```
 
 ---
-## Query Optimization
 
-### N+1 Problem
-Query tanpa optimization menyebabkan banyak query ke database.
+# Role-Based Access Control (RBAC)
 
-### Optimized Query
-Menggunakan select_related mengurangi jumlah query secara signifikan.
+| Role | Hak Akses |
+|------|-----------|
+| `student` | Enroll course, lihat course, tandai progress |
+| `instructor` | Semua hak student + buat & edit course miliknya |
+| `admin` | Semua hak + hapus course manapun |
 
-### Hasil Perbandingan
+---
 
-![Query Comparison](images/query.png)
-
-## API Documentation
+# API Documentation (Swagger)
 
 Swagger UI tersedia di `http://localhost:8000/api/docs`
 
 ![Swagger UI](img/swagger.png)
 
 ---
+
+# Testing dengan Postman
+
+Import file collection dari folder `postman/simple-lms.postman_collection.json` ke Postman.
+
+### Urutan Testing yang Disarankan
+
+1. Register akun instructor → login → simpan token
+2. Buat course menggunakan token instructor
+3. Register akun student → login → simpan token
+4. Enroll ke course menggunakan token student
+5. Tandai progress lesson menggunakan token student
+
+---
+
+# Screenshot
+
+## Docker Container Running
+
+![Docker PS](img/docker-ps.png)
+
+## Query Optimization
+
+Menggunakan `select_related` untuk menghindari N+1 problem.
+
+![Query Comparison](img/query.png)
+
+---
+
 # Author
 
 Nafis Aljufri
