@@ -7,3 +7,5 @@ python-jose==3.3.0
 passlib[bcrypt]==1.7.4
 django-ninja-simple-jwt
 Pillow
+redis
+django-redis

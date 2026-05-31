@@ -7,6 +7,7 @@ from ninja.errors import HttpError
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from django.http import FileResponse
+from django.core.cache import cache
 from lms.models import Enrollment, Course, Lesson, Progress
 from .schemas import (
     CourseIn, CourseUpdateSchema, CourseFilter,
@@ -14,17 +15,20 @@ from .schemas import (
     RegisterSchema, UpdateProfileSchema
 )
 from typing import List
+import redis
+
+r = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
 
 api = NinjaAPI()
 apiAuth = HttpJwtAuth()
 User = get_user_model()
 
+api.add_router("/auth/", mobile_auth_router)
+
 class CourseOut(Schema):
     id: int
     title: str
     description: str
-
-api.add_router("/auth/", mobile_auth_router)
 
 # ======================
 # RESPONSE HELPER
@@ -71,7 +75,6 @@ def update_profile(request, data: UpdateProfileSchema):
 # ======================
 # COURSES
 # ======================
-
 @api.get("/courses", response=List[CourseOut])
 @paginate(PageNumberPagination, page_size=10)
 def list_courses(request, filters: CourseFilter = Query(...), ordering: str = '-id'):
@@ -83,14 +86,55 @@ def list_courses(request, filters: CourseFilter = Query(...), ordering: str = '-
     qs = qs.order_by(ordering)
     return qs
 
+@api.get("/courses/popular")
+def popular_courses(request):
+    # Ambil top 10 dari Redis Sorted Set
+    top = r.zrevrange('popular_courses', 0, 9, withscores=True)
+
+    if not top:
+        # Jika belum ada di Redis, isi dari database
+        enrollments = Enrollment.objects.all()
+        for e in enrollments:
+            r.zincrby('popular_courses', 1, f'course:{e.course.id}')
+        top = r.zrevrange('popular_courses', 0, 9, withscores=True)
+
+    result = []
+    for course_key, score in top:
+        course_id = int(course_key.split(':')[1])
+        try:
+            course = Course.objects.get(id=course_id)
+            result.append({
+                "id": course.id,
+                "title": course.title,
+                "description": course.description,
+                "enrollment_count": int(score)
+            })
+        except Course.DoesNotExist:
+            pass
+
+    return success_response(result, "Top 10 popular courses")
+
 @api.get("/courses/{course_id}")
 def course_detail(request, course_id: int):
+    cache_key = f'course_detail:{course_id}'
+
+    # 1. Cek cache
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return success_response(cached, "Detail course (cached)")
+
+    # 2. Cache miss - query database
     course = get_object_or_404(Course, id=course_id)
-    return success_response({
+    data = {
         "id": course.id,
         "title": course.title,
         "description": course.description
-    }, "Detail course")
+    }
+
+    # 3. Simpan ke cache (TTL 5 menit)
+    cache.set(cache_key, data, timeout=300)
+
+    return success_response(data, "Detail course")
 
 @api.post("/courses", auth=apiAuth)
 def create_course(request, data: CourseIn):
@@ -102,6 +146,10 @@ def create_course(request, data: CourseIn):
         description=data.description,
         instructor=user
     )
+
+    # Invalidasi cache list
+    cache.delete('courses_list')
+
     return api.create_response(request, success_response({"id": course.id}, "Course created"), status=201)
 
 @api.patch("/courses/{course_id}", auth=apiAuth)
@@ -113,6 +161,11 @@ def update_course(request, course_id: int, data: CourseUpdateSchema):
     for attr, value in data.dict(exclude_unset=True).items():
         setattr(course, attr, value)
     course.save()
+
+    # Invalidasi cache
+    cache.delete('courses_list')
+    cache.delete(f'course_detail:{course_id}')
+
     return success_response(None, "Course updated")
 
 @api.delete("/courses/{course_id}", auth=apiAuth)
@@ -122,6 +175,11 @@ def delete_course(request, course_id: int):
     if course.instructor != user and not user.is_superuser:
         raise HttpError(403, "Hanya admin atau pemilik course yang bisa menghapus")
     course.delete()
+
+    # Invalidasi cache
+    cache.delete('courses_list')
+    cache.delete(f'course_detail:{course_id}')
+
     return success_response(None, "Course deleted")
 
 @api.post("/courses/{course_id}/upload-image", auth=apiAuth)
@@ -189,6 +247,10 @@ def enroll(request, data: EnrollmentIn):
     enrollment, created = Enrollment.objects.get_or_create(student=user, course=course)
     if not created:
         raise HttpError(400, "Already enrolled")
+
+    # Update popularity score di Redis Sorted Set
+    r.zincrby('popular_courses', 1, f'course:{data.course_id}')
+
     return success_response(None, "Enrolled")
 
 @api.get("/enrollments/my-courses", auth=apiAuth)
@@ -210,3 +272,26 @@ def mark_progress(request, enrollment_id: int, data: ProgressIn):
     progress.completed = True
     progress.save()
     return success_response(None, "Completed")
+
+# ======================
+# SESSION - Visit History
+# ======================
+@api.post("/courses/{course_id}/visit")
+def visit_course(request, course_id: int):
+    visited = request.session.get('visited_courses', [])
+    if course_id not in visited:
+        visited.append(course_id)
+        request.session['visited_courses'] = visited
+    return success_response({
+        "course_id": course_id,
+        "total_visited": len(visited),
+        "visited_courses": visited
+    }, "Visit recorded")
+
+@api.get("/my-history")
+def my_history(request):
+    visited = request.session.get('visited_courses', [])
+    return success_response({
+        "total_visited": len(visited),
+        "visited_courses": visited
+    }, "Visit history")
