@@ -215,6 +215,31 @@ Menggunakan `select_related` untuk menghindari N+1 problem.
 
 ---
 
+## Redis Caching
+
+### Verifikasi Redis Berjalan
+![Redis Ping](img/redis-ping.png)
+
+### Cache Hit/Miss di Redis MONITOR
+![Redis Monitor](img/redis-monitor.png)
+
+### Top 10 Popular Courses (Leaderboard)
+![Popular Courses](img/popular-courses.png)
+
+### Keys tersimpan di Redis
+![Redis Keys](img/redis-keys.png)
+
+## Fitur Caching yang Diimplementasikan
+
+| Fitur | Keterangan |
+|---|---|
+| Cache-Aside | GET /api/courses/{id} dicache 5 menit |
+| Cache Invalidation | Cache dihapus saat course diupdate/delete |
+| Leaderboard | Top 10 course terpopuler via Redis Sorted Set |
+| Session | Histori kunjungan user disimpan di Redis |
+
+---
+
 # Author
 
 Nafis Aljufri
