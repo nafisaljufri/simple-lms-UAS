@@ -75,6 +75,64 @@ class CourseOut(Schema):
 class LessonOut(Schema):
     id: int
     title: str
+    content: str
+    order: int
+    course_id: int
+
+
+class LessonIn(Schema):
+    course_id: int
+    title: str
+    content: str
+    order: int
+
+    @validator("course_id")
+    def lesson_course_id_valid(cls, v):
+        if v <= 0:
+            raise ValueError("Course ID tidak valid")
+        return v
+
+    @validator("title")
+    def lesson_title_not_empty(cls, v):
+        if not v.strip():
+            raise ValueError("Title tidak boleh kosong")
+        return v
+
+    @validator("content")
+    def lesson_content_not_empty(cls, v):
+        if not v.strip():
+            raise ValueError("Content tidak boleh kosong")
+        return v
+
+    @validator("order")
+    def lesson_order_valid(cls, v):
+        if v <= 0:
+            raise ValueError("Order tidak valid")
+        return v
+
+
+class LessonUpdateSchema(Schema):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    order: Optional[int] = None
+
+    @validator("title")
+    def lesson_update_title_not_empty(cls, v):
+        if v is not None and not v.strip():
+            raise ValueError("Title tidak boleh kosong")
+        return v
+
+    @validator("content")
+    def lesson_update_content_not_empty(cls, v):
+        if v is not None and not v.strip():
+            raise ValueError("Content tidak boleh kosong")
+        return v
+
+    @validator("order")
+    def lesson_update_order_valid(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError("Order tidak valid")
+        return v
 
 
 class DetailCourseOut(CourseOut):

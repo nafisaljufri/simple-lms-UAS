@@ -157,3 +157,17 @@ SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS = "default"
 SESSION_COOKIE_AGE = 86400
 SESSION_SAVE_EVERY_REQUEST = False
+
+# ==========================
+# CELERY CONFIG
+# ==========================
+
+CELERY_BROKER_URL = "amqp://guest:guest@rabbitmq:5672//"
+
+CELERY_RESULT_BACKEND = "rpc://"
+
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+
+CELERY_TIMEZONE = "UTC"

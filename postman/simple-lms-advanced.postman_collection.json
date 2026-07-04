@@ -1,28 +1,56 @@
 {
   "info": {
-    "name": "Simple LMS API",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    "name": "Simple LMS API - Current Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Postman collection synchronized with the current Django Ninja backend endpoints."
   },
+  "variable": [
+    {"key": "base_url", "value": "http://localhost:8000"},
+    {"key": "admin_token", "value": ""},
+    {"key": "instructor_token", "value": ""},
+    {"key": "student_token", "value": ""},
+    {"key": "course_id", "value": "1"},
+    {"key": "lesson_id", "value": "1"},
+    {"key": "enrollment_id", "value": "1"}
+  ],
   "item": [
     {
       "name": "AUTH",
       "item": [
         {
-          "name": "Register",
+          "name": "Register Admin",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"username\": \"admin1\",\n  \"password\": \"password123\",\n  \"role\": \"admin\"\n}"},
+            "url": "{{base_url}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Register Instructor",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"username\": \"instructor1\",\n  \"password\": \"password123\",\n  \"role\": \"instructor\"\n}"},
+            "url": "{{base_url}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Register Student",
           "request": {
             "method": "POST",
             "header": [{"key": "Content-Type", "value": "application/json"}],
             "body": {"mode": "raw", "raw": "{\n  \"username\": \"student1\",\n  \"password\": \"password123\",\n  \"role\": \"student\"\n}"},
-            "url": {"raw": "http://localhost:8000/api/auth/register", "host": ["localhost"], "port": "8000", "path": ["api", "auth", "register"]}
+            "url": "{{base_url}}/api/auth/register"
           }
         },
         {
-          "name": "Login (Sign In)",
+          "name": "Login",
           "request": {
             "method": "POST",
             "header": [{"key": "Content-Type", "value": "application/json"}],
             "body": {"mode": "raw", "raw": "{\n  \"username\": \"student1\",\n  \"password\": \"password123\"\n}"},
-            "url": {"raw": "http://localhost:8000/api/auth/sign-in", "host": ["localhost"], "port": "8000", "path": ["api", "auth", "sign-in"]}
+            "url": "{{base_url}}/api/auth/sign-in"
           }
         },
         {
@@ -30,16 +58,16 @@
           "request": {
             "method": "POST",
             "header": [{"key": "Content-Type", "value": "application/json"}],
-            "body": {"mode": "raw", "raw": "{\n  \"refresh\": \"isi_refresh_token_dari_login\"\n}"},
-            "url": {"raw": "http://localhost:8000/api/auth/token-refresh", "host": ["localhost"], "port": "8000", "path": ["api", "auth", "token-refresh"]}
+            "body": {"mode": "raw", "raw": "{\n  \"refresh\": \"paste_refresh_token_here\"\n}"},
+            "url": "{{base_url}}/api/auth/token-refresh"
           }
         },
         {
           "name": "Get Me",
           "request": {
             "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer isi_access_token"}],
-            "url": {"raw": "http://localhost:8000/api/auth/me", "host": ["localhost"], "port": "8000", "path": ["api", "auth", "me"]}
+            "header": [{"key": "Authorization", "value": "Bearer {{student_token}}"}],
+            "url": "{{base_url}}/api/auth/me"
           }
         },
         {
@@ -48,10 +76,10 @@
             "method": "PUT",
             "header": [
               {"key": "Content-Type", "value": "application/json"},
-              {"key": "Authorization", "value": "Bearer isi_access_token"}
+              {"key": "Authorization", "value": "Bearer {{student_token}}"}
             ],
-            "body": {"mode": "raw", "raw": "{\n  \"username\": \"nama_baru\"\n}"},
-            "url": {"raw": "http://localhost:8000/api/auth/me", "host": ["localhost"], "port": "8000", "path": ["api", "auth", "me"]}
+            "body": {"mode": "raw", "raw": "{\n  \"username\": \"student_renamed\"\n}"},
+            "url": "{{base_url}}/api/auth/me"
           }
         }
       ]
@@ -59,147 +87,92 @@
     {
       "name": "COURSES",
       "item": [
+        {"name": "List Courses", "request": {"method": "GET", "url": "{{base_url}}/api/courses?page=1"}},
+        {"name": "List Courses - Search and Ordering", "request": {"method": "GET", "url": "{{base_url}}/api/courses?search=django&ordering=-id&page=1"}},
+        {"name": "Popular Courses", "request": {"method": "GET", "url": "{{base_url}}/api/courses/popular"}},
+        {"name": "Course Detail", "request": {"method": "GET", "url": "{{base_url}}/api/courses/{{course_id}}"}},
         {
-          "name": "List Courses (dengan pagination)",
-          "request": {
-            "method": "GET",
-            "url": {"raw": "http://localhost:8000/api/courses?page=1", "host": ["localhost"], "port": "8000", "path": ["api", "courses"], "query": [{"key": "page", "value": "1"}]}
-          }
-        },
-        {
-          "name": "List Courses (dengan search)",
-          "request": {
-            "method": "GET",
-            "url": {"raw": "http://localhost:8000/api/courses?search=django&page=1", "host": ["localhost"], "port": "8000", "path": ["api", "courses"], "query": [{"key": "search", "value": "django"}, {"key": "page", "value": "1"}]}
-          }
-        },
-        {
-          "name": "List Courses (dengan sorting)",
-          "request": {
-            "method": "GET",
-            "url": {"raw": "http://localhost:8000/api/courses?ordering=-title&page=1", "host": ["localhost"], "port": "8000", "path": ["api", "courses"], "query": [{"key": "ordering", "value": "-title"}, {"key": "page", "value": "1"}]}
-          }
-        },
-        {
-          "name": "List Courses (filter + sort + pagination)",
-          "request": {
-            "method": "GET",
-            "url": {"raw": "http://localhost:8000/api/courses?search=django&ordering=-id&page=1", "host": ["localhost"], "port": "8000", "path": ["api", "courses"], "query": [{"key": "search", "value": "django"}, {"key": "ordering", "value": "-id"}, {"key": "page", "value": "1"}]}
-          }
-        },
-        {
-          "name": "Course Detail",
-          "request": {
-            "method": "GET",
-            "url": {"raw": "http://localhost:8000/api/courses/1", "host": ["localhost"], "port": "8000", "path": ["api", "courses", "1"]}
-          }
-        },
-        {
-          "name": "Create Course (Instructor)",
+          "name": "Create Course",
           "request": {
             "method": "POST",
-            "header": [
-              {"key": "Content-Type", "value": "application/json"},
-              {"key": "Authorization", "value": "Bearer isi_access_token_instructor"}
-            ],
-            "body": {"mode": "raw", "raw": "{\n  \"title\": \"Belajar Django\",\n  \"description\": \"Course tentang Django Ninja dan REST API\"\n}"},
-            "url": {"raw": "http://localhost:8000/api/courses", "host": ["localhost"], "port": "8000", "path": ["api", "courses"]}
+            "header": [{"key": "Content-Type", "value": "application/json"}, {"key": "Authorization", "value": "Bearer {{instructor_token}}"}],
+            "body": {"mode": "raw", "raw": "{\n  \"title\": \"Belajar Django Ninja\",\n  \"description\": \"Course tentang backend API dengan Django Ninja\"\n}"},
+            "url": "{{base_url}}/api/courses"
           }
         },
         {
-          "name": "Update Course - PATCH (Owner)",
+          "name": "Update Course",
           "request": {
             "method": "PATCH",
-            "header": [
-              {"key": "Content-Type", "value": "application/json"},
-              {"key": "Authorization", "value": "Bearer isi_access_token_instructor"}
-            ],
-            "body": {"mode": "raw", "raw": "{\n  \"title\": \"Judul Baru Saja\"\n}"},
-            "url": {"raw": "http://localhost:8000/api/courses/1", "host": ["localhost"], "port": "8000", "path": ["api", "courses", "1"]}
+            "header": [{"key": "Content-Type", "value": "application/json"}, {"key": "Authorization", "value": "Bearer {{instructor_token}}"}],
+            "body": {"mode": "raw", "raw": "{\n  \"title\": \"Belajar Django Ninja Updated\"\n}"},
+            "url": "{{base_url}}/api/courses/{{course_id}}"
           }
         },
-        {
-          "name": "Delete Course (Admin/Owner)",
-          "request": {
-            "method": "DELETE",
-            "header": [{"key": "Authorization", "value": "Bearer isi_access_token_admin"}],
-            "url": {"raw": "http://localhost:8000/api/courses/1", "host": ["localhost"], "port": "8000", "path": ["api", "courses", "1"]}
-          }
-        },
-        {
-          "name": "Upload Image Course",
-          "request": {
-            "method": "POST",
-            "header": [{"key": "Authorization", "value": "Bearer isi_access_token_instructor"}],
-            "body": {
-              "mode": "formdata",
-              "formdata": [{"key": "file", "type": "file", "src": ""}]
-            },
-            "url": {"raw": "http://localhost:8000/api/courses/1/upload-image", "host": ["localhost"], "port": "8000", "path": ["api", "courses", "1", "upload-image"]}
-          }
-        }
+        {"name": "Delete Course", "request": {"method": "DELETE", "header": [{"key": "Authorization", "value": "Bearer {{admin_token}}"}], "url": "{{base_url}}/api/courses/{{course_id}}"}},
+        {"name": "Upload Course Image", "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{instructor_token}}"}], "body": {"mode": "formdata", "formdata": [{"key": "file", "type": "file", "src": ""}]}, "url": "{{base_url}}/api/courses/{{course_id}}/upload-image"}},
+        {"name": "Visit Course", "request": {"method": "POST", "url": "{{base_url}}/api/courses/{{course_id}}/visit"}}
       ]
     },
     {
       "name": "LESSONS",
       "item": [
+        {"name": "List Lessons", "request": {"method": "GET", "url": "{{base_url}}/api/lessons?page=1"}},
+        {"name": "List Lessons by Course", "request": {"method": "GET", "url": "{{base_url}}/api/lessons?course_id={{course_id}}&page=1"}},
+        {"name": "Lesson Detail", "request": {"method": "GET", "url": "{{base_url}}/api/lessons/{{lesson_id}}"}},
         {
-          "name": "Upload Attachment Lesson",
+          "name": "Create Lesson",
           "request": {
             "method": "POST",
-            "header": [{"key": "Authorization", "value": "Bearer isi_access_token_instructor"}],
-            "body": {
-              "mode": "formdata",
-              "formdata": [{"key": "file", "type": "file", "src": ""}]
-            },
-            "url": {"raw": "http://localhost:8000/api/lessons/1/upload-attachment", "host": ["localhost"], "port": "8000", "path": ["api", "lessons", "1", "upload-attachment"]}
+            "header": [{"key": "Content-Type", "value": "application/json"}, {"key": "Authorization", "value": "Bearer {{instructor_token}}"}],
+            "body": {"mode": "raw", "raw": "{\n  \"course_id\": {{course_id}},\n  \"title\": \"Pengenalan Django Ninja\",\n  \"content\": \"Materi pembuka lesson\",\n  \"order\": 1\n}"},
+            "url": "{{base_url}}/api/lessons"
           }
         },
         {
-          "name": "Download Attachment Lesson",
+          "name": "Update Lesson",
           "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer isi_access_token_student"}],
-            "url": {"raw": "http://localhost:8000/api/lessons/1/download", "host": ["localhost"], "port": "8000", "path": ["api", "lessons", "1", "download"]}
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}, {"key": "Authorization", "value": "Bearer {{instructor_token}}"}],
+            "body": {"mode": "raw", "raw": "{\n  \"title\": \"Pengenalan Django Ninja Updated\"\n}"},
+            "url": "{{base_url}}/api/lessons/{{lesson_id}}"
+          }
+        },
+        {"name": "Delete Lesson", "request": {"method": "DELETE", "header": [{"key": "Authorization", "value": "Bearer {{instructor_token}}"}], "url": "{{base_url}}/api/lessons/{{lesson_id}}"}},
+        {"name": "Upload Lesson Attachment", "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{instructor_token}}"}], "body": {"mode": "formdata", "formdata": [{"key": "file", "type": "file", "src": ""}]}, "url": "{{base_url}}/api/lessons/{{lesson_id}}/upload-attachment"}},
+        {"name": "Download Lesson Attachment", "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{student_token}}"}], "url": "{{base_url}}/api/lessons/{{lesson_id}}/download"}}
+      ]
+    },
+    {
+      "name": "ENROLLMENTS AND PROGRESS",
+      "item": [
+        {
+          "name": "Enroll to Course",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}, {"key": "Authorization", "value": "Bearer {{student_token}}"}],
+            "body": {"mode": "raw", "raw": "{\n  \"course_id\": {{course_id}}\n}"},
+            "url": "{{base_url}}/api/enrollments"
+          }
+        },
+        {"name": "My Courses", "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{student_token}}"}], "url": "{{base_url}}/api/enrollments/my-courses"}},
+        {
+          "name": "Mark Lesson Complete",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}, {"key": "Authorization", "value": "Bearer {{student_token}}"}],
+            "body": {"mode": "raw", "raw": "{\n  \"lesson_id\": {{lesson_id}}\n}"},
+            "url": "{{base_url}}/api/enrollments/{{enrollment_id}}/progress"
           }
         }
       ]
     },
     {
-      "name": "ENROLLMENTS",
+      "name": "GENERAL",
       "item": [
-        {
-          "name": "Enroll to Course (Student)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {"key": "Content-Type", "value": "application/json"},
-              {"key": "Authorization", "value": "Bearer isi_access_token_student"}
-            ],
-            "body": {"mode": "raw", "raw": "{\n  \"course_id\": 1\n}"},
-            "url": {"raw": "http://localhost:8000/api/enrollments", "host": ["localhost"], "port": "8000", "path": ["api", "enrollments"]}
-          }
-        },
-        {
-          "name": "My Courses",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer isi_access_token_student"}],
-            "url": {"raw": "http://localhost:8000/api/enrollments/my-courses", "host": ["localhost"], "port": "8000", "path": ["api", "enrollments", "my-courses"]}
-          }
-        },
-        {
-          "name": "Mark Lesson Complete",
-          "request": {
-            "method": "POST",
-            "header": [
-              {"key": "Content-Type", "value": "application/json"},
-              {"key": "Authorization", "value": "Bearer isi_access_token_student"}
-            ],
-            "body": {"mode": "raw", "raw": "{\n  \"lesson_id\": 1\n}"},
-            "url": {"raw": "http://localhost:8000/api/enrollments/1/progress", "host": ["localhost"], "port": "8000", "path": ["api", "enrollments", "1", "progress"]}
-          }
-        }
+        {"name": "Hello", "request": {"method": "GET", "url": "{{base_url}}/api/hello"}},
+        {"name": "My History", "request": {"method": "GET", "url": "{{base_url}}/api/my-history"}},
+        {"name": "Trigger Test Task", "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{admin_token}}"}], "url": "{{base_url}}/api/test-task"}}
       ]
     }
   ]

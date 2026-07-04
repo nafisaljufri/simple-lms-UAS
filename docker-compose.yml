@@ -1,4 +1,5 @@
 services:
+
   web:
     build: .
     ports:
@@ -8,8 +9,7 @@ services:
     depends_on:
       - db
       - redis
-    environment:
-      - REDIS_URL=redis://redis:6379/0
+      - rabbitmq
 
   db:
     image: postgres:15
@@ -28,7 +28,31 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  celery_worker:
+    build: .
+    command: celery -A config worker -l info
+    volumes:
+      - .:/app
+    depends_on:
+      - rabbitmq
+      - db
+
+  flower:
+    build: .
+    command: celery -A config flower --port=5555
+    ports:
+      - "5555:5555"
+    depends_on:
+      - rabbitmq
+      - celery_worker
 
 volumes:
   pg_data:

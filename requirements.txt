@@ -9,3 +9,8 @@ django-ninja-simple-jwt
 Pillow
 redis
 django-redis
+
+celery
+flower
+amqp
+kombu

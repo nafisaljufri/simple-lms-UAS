@@ -1,98 +1,51 @@
-# Simple LMS - Django REST API Project
+# Simple LMS - Django Ninja API
 
-Project ini merupakan implementasi Learning Management System (LMS) menggunakan Django Ninja dengan JWT Authentication dan Role-Based Access Control (RBAC), dijalankan menggunakan Docker.
+Simple LMS adalah backend Learning Management System sederhana yang dibangun dengan Django, Django Ninja, PostgreSQL, JWT Authentication, RBAC, Redis, dan Docker Compose.
 
----
+Project ini menyediakan API untuk autentikasi, course, lesson, enrollment, progress belajar, upload file, cache Redis, session history, dan Celery task demo.
 
-# Teknologi yang Digunakan
+## Technology Stack
 
-* Docker & Docker Compose
-* Django + Django Ninja
-* PostgreSQL
-* ninja-simple-jwt (JWT Authentication)
-* Pydantic Schema Validation
+- Python 3.11
+- Django
+- Django Ninja
+- PostgreSQL
+- ninja-simple-jwt
+- Redis
+- Celery, RabbitMQ, Flower
+- Docker Compose
 
----
+## Docker Setup
 
-# Struktur Project
-
-```
-simple-lms/
-├── docker-compose.yml
-├── Dockerfile
-├── .env
-├── requirements.txt
-├── manage.py
-├── jwt-signing.pub
-├── config/
-│   ├── settings.py
-│   ├── urls.py
-│   ├── apiv1.py
-│   ├── schemas.py
-│   ├── permissions.py
-│   ├── helpers.py
-│   └── wsgi.py
-├── lms/
-│   ├── models.py
-│   ├── admin.py
-│   └── migrations/
-├── postman/
-│   └── simple-lms.postman_collection.json
-└── img/
-    └── swagger.png
-```
-
-![Structure](img/struktur.png)
-
----
-
-# Cara Menjalankan Project
-
-## 1. Masuk ke Folder Project
-
-```bash
-cd simple-lms
-```
-
-## 2. Jalankan Docker
+Pastikan Docker Desktop sudah berjalan, lalu jalankan:
 
 ```bash
 docker compose up -d
 ```
 
-![Docker Compose](img/docker-compose.png)
+Service utama:
 
-## 3. Jalankan Migration
+| Service | Port | Keterangan |
+|---|---:|---|
+| `web` | `8000` | Django API |
+| `db` | `5432` | PostgreSQL |
+| `redis` | `6379` | Cache, session, leaderboard |
+| `rabbitmq` | `5672`, `15672` | Celery broker dan dashboard |
+| `celery_worker` | - | Worker async task |
+| `flower` | `5555` | Celery monitoring |
+
+## Environment Variables
+
+Buat file `.env` dari `.env.example`.
 
 ```bash
-docker compose exec web python manage.py migrate
+cp .env.example .env
 ```
 
-![Docker Migrate](img/migration.png)
+Contoh konfigurasi:
 
-## 4. Generate RSA Keys (JWT)
-
-```bash
-docker compose exec web python manage.py make_rsa
-```
-
-## 5. Akses API Documentation
-
-Buka browser dan akses Swagger UI:
-
-```
-http://localhost:8000/api/docs
-```
-
----
-
-# Konfigurasi Environment Variables
-
-File `.env` digunakan untuk menyimpan konfigurasi:
-
-```
+```env
 DEBUG=True
-
 DB_NAME=lms_db
 DB_USER=postgres
 DB_PASSWORD=postgres
@@ -100,146 +53,211 @@ DB_HOST=db
 DB_PORT=5432
 ```
 
-![ENV](img/env.png)
+Jangan commit `.env` karena berisi konfigurasi lokal.
 
----
+## Migration Steps
 
-# API Endpoints
+Jalankan migration setelah container aktif:
+
+```bash
+docker compose exec web python manage.py migrate
+```
+
+Opsional, buat superuser untuk akses Django Admin:
+
+```bash
+docker compose exec web python manage.py createsuperuser
+```
+
+API tersedia di:
+
+```text
+http://localhost:8000/api/
+```
+
+Swagger tersedia di:
+
+```text
+http://localhost:8000/api/docs
+```
+
+## Demo Accounts
+
+Demo accounts dapat dibuat melalui Swagger atau Postman memakai endpoint `POST /api/auth/register`.
+
+Gunakan data berikut untuk skenario demo:
+
+| Role | Username | Password | Catatan |
+|---|---|---|---|
+| Admin | `admin1` | `password123` | Full access ke resource API |
+| Instructor | `instructor1` | `password123` | Kelola course dan lesson miliknya |
+| Student | `student1` | `password123` | Enroll course dan update progress |
+
+Contoh register:
+
+```json
+{
+  "username": "student1",
+  "password": "password123",
+  "role": "student"
+}
+```
 
 ## Authentication
 
-| Method | Endpoint | Deskripsi | Auth |
-|--------|----------|-----------|------|
-| POST | `/api/auth/register` | Register user baru | ❌ |
-| POST | `/api/auth/sign-in` | Login & dapat JWT token | ❌ |
-| POST | `/api/auth/token-refresh` | Refresh access token | ❌ |
-| GET | `/api/auth/me` | Get profil user login | ✅ |
-| PUT | `/api/auth/me` | Update profil user | ✅ |
+Login menggunakan:
 
-## Courses
+```text
+POST /api/auth/sign-in
+```
 
-| Method | Endpoint | Deskripsi | Role |
-|--------|----------|-----------|------|
-| GET | `/api/courses` | List semua course (pagination & filter) | Public |
-| GET | `/api/courses/{id}` | Detail course | Public |
-| POST | `/api/courses` | Buat course baru | Instructor |
-| PATCH | `/api/courses/{id}` | Update course | Owner |
-| DELETE | `/api/courses/{id}` | Hapus course | Admin/Owner |
-
-## Enrollments
-
-| Method | Endpoint | Deskripsi | Role |
-|--------|----------|-----------|------|
-| POST | `/api/enrollments` | Enroll ke course | Student |
-| GET | `/api/enrollments/my-courses` | Daftar course saya | Student |
-| POST | `/api/enrollments/{id}/progress` | Tandai lesson selesai | Student |
-
----
-
-# JWT Authentication
-
-Project ini menggunakan `ninja-simple-jwt` dengan RSA key pair.
-
-### Cara Login
+Body:
 
 ```json
-POST /api/auth/sign-in
 {
   "username": "student1",
   "password": "password123"
 }
 ```
 
-### Response
+Gunakan access token pada endpoint protected:
 
-```json
-{
-  "access": "eyJhbGci...",
-  "refresh": "eyJhbGci..."
-}
+```text
+Authorization: Bearer <access_token>
 ```
 
-### Menggunakan Token
+## Endpoint Summary
 
-Sertakan access token di header setiap request ke protected endpoint:
+### Authentication
 
-```
-Authorization: Bearer eyJhbGci...
-```
+| Method | Endpoint | Auth | Keterangan |
+|---|---|---|---|
+| POST | `/api/auth/register` | Public | Register user |
+| POST | `/api/auth/sign-in` | Public | Login dan ambil JWT |
+| POST | `/api/auth/token-refresh` | Public | Refresh access token |
+| GET | `/api/auth/me` | JWT | Profil user login |
+| PUT | `/api/auth/me` | JWT | Update username |
 
----
+### Courses
 
-# Role-Based Access Control (RBAC)
+| Method | Endpoint | Auth / Role | Keterangan |
+|---|---|---|---|
+| GET | `/api/courses` | Public | List course dengan pagination, search, ordering |
+| GET | `/api/courses/popular` | Public | Top 10 popular courses dari Redis |
+| GET | `/api/courses/{course_id}` | Public | Detail course |
+| POST | `/api/courses` | Admin / Instructor | Buat course |
+| PATCH | `/api/courses/{course_id}` | Admin / Owner | Update course |
+| DELETE | `/api/courses/{course_id}` | Admin / Owner | Delete course |
+| POST | `/api/courses/{course_id}/upload-image` | Admin / Owner | Upload image course |
+| POST | `/api/courses/{course_id}/visit` | Public | Simpan visit history di session |
+
+### Lessons
+
+| Method | Endpoint | Auth / Role | Keterangan |
+|---|---|---|---|
+| GET | `/api/lessons` | Public | List lesson, optional `course_id` |
+| GET | `/api/lessons/{lesson_id}` | Public | Detail lesson |
+| POST | `/api/lessons` | Admin / Course Owner | Buat lesson |
+| PATCH | `/api/lessons/{lesson_id}` | Admin / Course Owner | Update lesson |
+| DELETE | `/api/lessons/{lesson_id}` | Admin / Course Owner | Delete lesson |
+| POST | `/api/lessons/{lesson_id}/upload-attachment` | Admin / Course Owner | Upload attachment |
+| GET | `/api/lessons/{lesson_id}/download` | Admin / Course Owner / Enrolled Student | Download attachment |
+
+### Enrollments and Progress
+
+| Method | Endpoint | Auth / Role | Keterangan |
+|---|---|---|---|
+| POST | `/api/enrollments` | Student | Enroll ke course |
+| GET | `/api/enrollments/my-courses` | JWT | List course yang diikuti user |
+| POST | `/api/enrollments/{enrollment_id}/progress` | Student pemilik enrollment | Tandai lesson selesai |
+
+### General
+
+| Method | Endpoint | Auth / Role | Keterangan |
+|---|---|---|---|
+| GET | `/api/hello` | Public | API health message sederhana |
+| GET | `/api/my-history` | Public session | Riwayat visit course |
+| POST | `/api/test-task` | Admin | Kirim Celery test task |
+
+## RBAC Summary
 
 | Role | Hak Akses |
-|------|-----------|
-| `student` | Enroll course, lihat course, tandai progress |
-| `instructor` | Semua hak student + buat & edit course miliknya |
-| `admin` | Semua hak + hapus course manapun |
-
----
-
-# API Documentation (Swagger)
-
-Swagger UI tersedia di `http://localhost:8000/api/docs`
-
-![Swagger UI](img/swagger.png)
-
----
-
-# Testing dengan Postman
-
-Import file collection dari folder `postman/simple-lms.postman_collection.json` ke Postman.
-
-### Urutan Testing yang Disarankan
-
-1. Register akun instructor → login → simpan token
-2. Buat course menggunakan token instructor
-3. Register akun student → login → simpan token
-4. Enroll ke course menggunakan token student
-5. Tandai progress lesson menggunakan token student
-
----
-
-# Screenshot
-
-## Docker Container Running
-
-![Docker PS](img/docker-ps.png)
-
-## Query Optimization
-
-Menggunakan `select_related` untuk menghindari N+1 problem.
-
-![Query Comparison](img/query.png)
-
----
-
-## Redis Caching
-
-### Verifikasi Redis Berjalan
-![Redis Ping](img/redis-ping.png)
-
-### Cache Hit/Miss di Redis MONITOR
-![Redis Monitor](img/redis-monitor.png)
-
-### Top 10 Popular Courses (Leaderboard)
-![Popular Courses](img/popular-courses.png)
-
-### Keys tersimpan di Redis
-![Redis Keys](img/redis-keys.png)
-
-## Fitur Caching yang Diimplementasikan
-
-| Fitur | Keterangan |
 |---|---|
-| Cache-Aside | GET /api/courses/{id} dicache 5 menit |
-| Cache Invalidation | Cache dihapus saat course diupdate/delete |
-| Leaderboard | Top 10 course terpopuler via Redis Sorted Set |
-| Session | Histori kunjungan user disimpan di Redis |
+| Anonymous | Endpoint public saja |
+| Student | Lihat course/lesson, enroll, lihat course sendiri, update progress untuk lesson pada course yang di-enroll |
+| Instructor | Buat course, kelola course/lesson miliknya, upload file untuk resource miliknya |
+| Admin | Full access ke resource course/lesson dan task admin |
 
----
+## How To Test With Swagger
 
-# Author
+1. Buka `http://localhost:8000/api/docs`.
+2. Register user demo melalui `POST /api/auth/register`.
+3. Login melalui `POST /api/auth/sign-in`.
+4. Copy `access` token dari response.
+5. Klik tombol authorize di Swagger.
+6. Masukkan token dengan format:
+
+```text
+Bearer <access_token>
+```
+
+7. Jalankan skenario:
+   - Instructor membuat course.
+   - Instructor membuat lesson pada course.
+   - Student enroll ke course.
+   - Student update progress lesson pada enrollment tersebut.
+
+## How To Test With Postman
+
+1. Import collection:
+
+```text
+postman/simple-lms-advanced.postman_collection.json
+```
+
+2. Jalankan request register/login untuk role demo.
+3. Simpan access token dari login.
+4. Isi header Authorization pada request protected:
+
+```text
+Bearer <access_token>
+```
+
+5. Jalankan urutan berikut:
+   - Register/login instructor.
+   - Create course.
+   - Create lesson.
+   - Register/login student.
+   - Enroll course.
+   - Mark lesson progress.
+
+## Automated Tests
+
+Focused backend tests tersedia di `lms/tests.py`.
+
+Jalankan dengan:
+
+```bash
+docker compose exec web python manage.py test lms
+```
+
+Coverage utama:
+
+- RBAC course dan lesson
+- Lesson CRUD
+- Enrollment
+- Progress validation antar course
+
+## Screenshots
+
+Beberapa screenshot pendukung tersedia di folder `img/`.
+
+- Docker Compose: `img/docker-compose.png`
+- Swagger: `img/swagger.png`
+- Redis: `img/redis-ping.png`, `img/redis-monitor.png`, `img/redis-keys.png`
+- Popular courses: `img/popular-courses.png`
+- Query optimization: `img/query.png`
+
+## Author
 
 Nafis Aljufri
