@@ -499,7 +499,6 @@ def hello(request):
     return success_response(None, "API is running")
 
 from django.db import connection
-import time
 from datetime import datetime
 from config.celery import app as celery_app
 

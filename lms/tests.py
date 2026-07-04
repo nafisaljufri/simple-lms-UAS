@@ -237,3 +237,18 @@ class LMSAPITestCase(TestCase):
         self.assertIn("redis", data)
         self.assertIn("celery", data)
         self.assertIn("timestamp", data)
+
+    def test_popular_courses_endpoint(self):
+        response = self.client.get("/api/courses/popular")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("data", response.json())
+
+    def test_student_dashboard_access(self):
+        with self.auth_as(self.student):
+            response = self.client.get("/api/dashboard/student", HTTP_AUTHORIZATION="Bearer test-token")
+        self.assertEqual(response.status_code, 200)
+
+    def test_instructor_dashboard_access(self):
+        with self.auth_as(self.instructor):
+            response = self.client.get("/api/dashboard/instructor", HTTP_AUTHORIZATION="Bearer test-token")
+        self.assertEqual(response.status_code, 200)
