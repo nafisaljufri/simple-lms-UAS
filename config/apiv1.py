@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from django.http import FileResponse
 from django.core.cache import cache
+from django.db.models import Count, Q, Sum
 from lms.models import Enrollment, Course, Lesson, Progress
 from lms.tasks import test_task
 from .schemas import (
@@ -85,11 +86,36 @@ api.add_router("/courses", courses_router)
 @courses_router.get("", response=List[CourseOut])
 @paginate(PageNumberPagination, page_size=10)
 def list_courses(request, filters: CourseFilter = Query(...), ordering: str = '-id'):
-    allowed_fields = ['title', '-title', 'id', '-id', 'description', '-description']
+    q = request.GET.get('q')
+    category = request.GET.get('category')
+    instructor = request.GET.get('instructor')
+    allowed_fields = [
+        'title', '-title', 'id', '-id',
+        'description', '-description',
+        'category__name', '-category__name',
+        'instructor__username', '-instructor__username',
+    ]
     if ordering not in allowed_fields:
         ordering = '-id'
-    qs = Course.objects.all()
+    qs = Course.objects.select_related('instructor', 'category').all()
     qs = filters.filter(qs)
+    if q:
+        qs = qs.filter(
+            Q(title__icontains=q) |
+            Q(description__icontains=q) |
+            Q(category__name__icontains=q) |
+            Q(instructor__username__icontains=q)
+        )
+    if category:
+        if category.isdigit():
+            qs = qs.filter(category_id=int(category))
+        else:
+            qs = qs.filter(category__name__icontains=category)
+    if instructor:
+        if instructor.isdigit():
+            qs = qs.filter(instructor_id=int(instructor))
+        else:
+            qs = qs.filter(instructor__username__icontains=instructor)
     qs = qs.order_by(ordering)
     return qs
 
@@ -326,7 +352,144 @@ def mark_progress(request, enrollment_id: int, data: ProgressIn):
     return success_response(None, "Completed")
 
 # ======================
-# 5. ROUTER: GENERAL & HISTORY
+# 5. ROUTER: DASHBOARD
+# ======================
+dashboard_router = Router(tags=["Dashboard"])
+api.add_router("/dashboard", dashboard_router)
+
+@dashboard_router.get("/student", auth=apiAuth)
+def student_dashboard(request):
+    user = User.objects.get(pk=request.user.id)
+    if user.role != "student":
+        raise HttpError(403, "Student only")
+
+    enrollments = list(
+        Enrollment.objects.filter(student=user)
+        .select_related('course')
+        .annotate(total_lessons=Count('course__lessons', distinct=True))
+    )
+    course_ids = [enrollment.course_id for enrollment in enrollments]
+    completed_by_course = {
+        item['lesson__course_id']: item['completed_count']
+        for item in Progress.objects.filter(
+            student=user,
+            completed=True,
+            lesson__course_id__in=course_ids,
+        )
+        .values('lesson__course_id')
+        .annotate(completed_count=Count('lesson_id', distinct=True))
+    }
+
+    active_courses = 0
+    completed_courses = 0
+    progress_values = []
+    course_summaries = []
+
+    for enrollment in enrollments:
+        total_lessons = enrollment.total_lessons
+        completed_lessons = completed_by_course.get(enrollment.course_id, 0)
+        progress_percent = round((completed_lessons / total_lessons) * 100, 2) if total_lessons else 0
+        progress_values.append(progress_percent)
+        if total_lessons and completed_lessons >= total_lessons:
+            completed_courses += 1
+        else:
+            active_courses += 1
+        course_summaries.append({
+            "enrollment_id": enrollment.id,
+            "course_id": enrollment.course_id,
+            "title": enrollment.course.title,
+            "total_lessons": total_lessons,
+            "completed_lessons": completed_lessons,
+            "progress_percent": progress_percent,
+        })
+
+    recent_progress = (
+        Progress.objects.filter(student=user, lesson__course_id__in=course_ids)
+        .select_related('lesson', 'lesson__course')
+        .order_by('-id')[:5]
+    )
+    recently_accessed_lessons = [
+        {
+            "lesson_id": progress.lesson_id,
+            "lesson_title": progress.lesson.title,
+            "course_id": progress.lesson.course_id,
+            "course_title": progress.lesson.course.title,
+            "completed": progress.completed,
+        }
+        for progress in recent_progress
+    ]
+
+    total_enrollments = len(enrollments)
+    average_progress = round(sum(progress_values) / total_enrollments, 2) if total_enrollments else 0
+    data = {
+        "total_enrollments": total_enrollments,
+        "active_courses": active_courses,
+        "completed_courses": completed_courses,
+        "average_progress": average_progress,
+        "recently_accessed_lessons": recently_accessed_lessons,
+        "summary": {
+            "completed_lessons": sum(completed_by_course.values()),
+            "total_lessons": sum(enrollment.total_lessons for enrollment in enrollments),
+            "courses": course_summaries,
+        },
+    }
+    return success_response(data, "Student dashboard")
+
+@dashboard_router.get("/instructor", auth=apiAuth)
+def instructor_dashboard(request):
+    user = User.objects.get(pk=request.user.id)
+    if user.role != "instructor" and not is_admin_user(user):
+        raise HttpError(403, "Instructor or admin only")
+
+    courses = Course.objects.all() if is_admin_user(user) else Course.objects.filter(instructor=user)
+    courses = courses.select_related('instructor', 'category')
+    course_ids = list(courses.values_list('id', flat=True))
+    total_courses = len(course_ids)
+    total_lessons = Lesson.objects.filter(course_id__in=course_ids).count()
+    enrollments = Enrollment.objects.filter(course_id__in=course_ids)
+    total_enrollments = enrollments.count()
+    total_students = enrollments.values('student_id').distinct().count()
+
+    possible_progress = (
+        enrollments.annotate(lesson_count=Count('course__lessons'))
+        .aggregate(total=Sum('lesson_count'))['total'] or 0
+    )
+    completed_progress = Progress.objects.filter(
+        completed=True,
+        lesson__course_id__in=course_ids,
+        student__enrollment__course_id__in=course_ids,
+    ).distinct().count()
+    completion_rate = round((completed_progress / possible_progress) * 100, 2) if possible_progress else 0
+
+    course_stats = [
+        {
+            "course_id": item['id'],
+            "title": item['title'],
+            "lesson_count": item['lesson_count'],
+            "enrollment_count": item['enrollment_count'],
+        }
+        for item in courses.annotate(
+            lesson_count=Count('lessons', distinct=True),
+            enrollment_count=Count('enrollment', distinct=True),
+        ).values('id', 'title', 'lesson_count', 'enrollment_count')
+    ]
+
+    data = {
+        "total_courses": total_courses,
+        "total_lessons": total_lessons,
+        "total_students": total_students,
+        "total_enrollments": total_enrollments,
+        "completion_rate": completion_rate,
+        "statistics": {
+            "completed_progress": completed_progress,
+            "possible_progress": possible_progress,
+            "courses": course_stats,
+        },
+    }
+    return success_response(data, "Instructor dashboard")
+
+# ======================
+# 6. ROUTER: GENERAL & HISTORY
 # ======================
 general_router = Router(tags=["General", "History"])
 api.add_router("/", general_router)
