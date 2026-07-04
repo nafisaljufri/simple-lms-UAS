@@ -227,3 +227,13 @@ class LMSAPITestCase(TestCase):
                 lesson=self.other_lesson,
             ).exists()
         )
+
+    def test_health_check_endpoint(self):
+        response = self.client.get("/api/health")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("status", data)
+        self.assertIn("database", data)
+        self.assertIn("redis", data)
+        self.assertIn("celery", data)
+        self.assertIn("timestamp", data)

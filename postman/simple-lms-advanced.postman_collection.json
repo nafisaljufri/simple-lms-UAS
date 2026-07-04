@@ -171,6 +171,7 @@
       "name": "GENERAL",
       "item": [
         {"name": "Hello", "request": {"method": "GET", "url": "{{base_url}}/api/hello"}},
+        {"name": "Health Check", "request": {"method": "GET", "url": "{{base_url}}/api/health"}},
         {"name": "My History", "request": {"method": "GET", "url": "{{base_url}}/api/my-history"}},
         {"name": "Trigger Test Task", "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{admin_token}}"}], "url": "{{base_url}}/api/test-task"}}
       ]

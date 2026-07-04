@@ -20,6 +20,8 @@ Sistem menyediakan fitur utama untuk mengelola course, lesson, enrollment, dan p
 | Enrollment | Implemented | Student dapat enroll course dan melihat course miliknya |
 | Progress | Implemented | Student dapat menandai lesson selesai hanya pada course yang di-enroll |
 | README | Implemented | Dokumentasi setup, endpoint, Swagger, Postman, dan testing |
+| Health Check | Implemented | `GET /api/health` menampilkan status koneksi db, redis, celery, dan server timestamp |
+| Seed Demo | Implemented | Command `python manage.py seed_demo` menghasilkan data demo secara idempotent |
 
 ## Implemented Additional Features
 

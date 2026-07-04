@@ -52,7 +52,7 @@ def can_manage_course(user, course):
 # ======================
 auth_router = Router(tags=["Authentication"])
 api.add_router("/auth/", auth_router)
-api.add_router("/auth/", mobile_auth_router)  # Untuk login/token dari ninja-simple-jwt
+api.add_router("/auth/", mobile_auth_router, tags=["Authentication"])  # Untuk login/token dari ninja-simple-jwt
 
 @auth_router.post("/register")
 def register(request, data: RegisterSchema):
@@ -491,12 +491,51 @@ def instructor_dashboard(request):
 # ======================
 # 6. ROUTER: GENERAL & HISTORY
 # ======================
-general_router = Router(tags=["General", "History"])
+general_router = Router(tags=["General"])
 api.add_router("/", general_router)
 
 @general_router.get("/hello")
 def hello(request):
     return success_response(None, "API is running")
+
+from django.db import connection
+import time
+from datetime import datetime
+from config.celery import app as celery_app
+
+@general_router.get("/health", auth=None)
+def health_check(request):
+    status = {
+        "status": "ok",
+        "timestamp": datetime.now().isoformat(),
+        "database": "down",
+        "redis": "down",
+        "celery": "down",
+    }
+    
+    try:
+        connection.ensure_connection()
+        status["database"] = "ok"
+    except Exception:
+        pass
+        
+    try:
+        if r.ping():
+            status["redis"] = "ok"
+    except Exception:
+        pass
+        
+    try:
+        with celery_app.connection() as conn:
+            conn.ensure_connection(max_retries=1)
+            status["celery"] = "ok"
+    except Exception:
+        pass
+        
+    if "down" in status.values():
+        status["status"] = "degraded"
+        
+    return status
 
 @general_router.post("/test-task", auth=apiAuth)
 def trigger_test_task(request):

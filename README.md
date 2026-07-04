@@ -65,8 +65,13 @@ docker compose exec web python manage.py migrate
 
 Opsional, buat superuser untuk akses Django Admin:
 
-```bash
 docker compose exec web python manage.py createsuperuser
+```
+
+Untuk memuat data awal (demo data), jalankan command berikut:
+
+```bash
+docker compose exec web python manage.py seed_demo
 ```
 
 API tersedia di:
@@ -175,7 +180,8 @@ Authorization: Bearer <access_token>
 
 | Method | Endpoint | Auth / Role | Keterangan |
 |---|---|---|---|
-| GET | `/api/hello` | Public | API health message sederhana |
+| GET | `/api/hello` | Public | API hello message sederhana |
+| GET | `/api/health` | Public | API health check mendetail |
 | GET | `/api/my-history` | Public session | Riwayat visit course |
 | POST | `/api/test-task` | Admin | Kirim Celery test task |
 
