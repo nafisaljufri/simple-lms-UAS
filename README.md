@@ -1,269 +1,395 @@
-# Simple LMS - Django Ninja API
+﻿# Simple LMS
 
-Simple LMS adalah backend Learning Management System sederhana yang dibangun dengan Django, Django Ninja, PostgreSQL, JWT Authentication, RBAC, Redis, dan Docker Compose.
+Backend RESTful Learning Management System (LMS) berkualitas produksi yang dibangun menggunakan Django Ninja. Project ini menyediakan API yang kuat untuk mengelola Course, Lesson, Enrollment, dan Progress tracking bagi pengguna. Selain itu, project ini dilengkapi dengan Role-Based Access Control (RBAC) yang komprehensif, Redis Cache, serta pemrosesan Background Task secara asinkron melalui Celery dan RabbitMQ.
 
-Project ini menyediakan API untuk autentikasi, course, lesson, enrollment, progress belajar, upload file, cache Redis, session history, dan Celery task demo.
+## Project Highlights
 
-## Technology Stack
+Project ini memiliki beberapa fitur utama yang menjadi nilai tambah dibanding implementasi LMS dasar.
 
-- Python 3.11
-- Django
-- Django Ninja
-- PostgreSQL
-- ninja-simple-jwt
-- Redis
-- Celery, RabbitMQ, Flower
-- Docker Compose
+- JWT Authentication
+- Role-Based Access Control (Admin, Instructor, Student)
+- Course & Lesson CRUD
+- Student Dashboard
+- Instructor Dashboard
+- Redis Cache
+- RabbitMQ
+- Celery
+- Flower Monitoring
+- Docker Compose Deployment
+- Swagger API Documentation
+- Postman Collection
+- Automated Testing
+- Seed Demo Command
 
-## Docker Setup
+---
 
-Pastikan Docker Desktop sudah berjalan, lalu jalankan:
+# Features
 
-```bash
-docker compose up -d
+### Authentication
+- **Register**: Pendaftaran pengguna yang aman.
+- **Login (JWT)**: Autentikasi berbasis Token menggunakan `ninja-simple-jwt`.
+- **Refresh Token**: Pembaruan Token secara otomatis tanpa kendala.
+- **Profile**: Melihat dan memperbarui data Profile pengguna.
+
+### Role Based Access Control
+- **Admin**: Akses penuh ke seluruh sumber daya dan tugas administratif.
+- **Instructor**: Membuat dan mengelola Course dan Lesson milik mereka sendiri.
+- **Student**: Melakukan Enrollment pada Course, melihat konten, dan melacak Progress pembelajaran.
+- **Anonymous**: Akses hanya baca untuk melihat daftar Course dan Lesson publik.
+
+### Course Management
+- Operasi CRUD penuh.
+- Upload gambar (image Upload).
+- Kemampuan Search, Filtering, dan Sorting.
+- Pelacakan kunjungan (visit tracking).
+
+### Lesson Management
+- Operasi CRUD penuh.
+- Upload dan Download berkas (Attachment) secara aman.
+- Pengaturan urutan Lesson di dalam Course.
+
+### Enrollment
+- Student dapat melakukan Enrollment pada Course yang tersedia secara aman.
+- Endpoint khusus untuk melihat daftar Course yang telah terdaftar.
+
+### Progress Tracking
+- Student dapat menandai Lesson secara individual sebagai selesai.
+- Validasi untuk memastikan Student hanya dapat melacak Progress untuk Course yang sudah di-Enrollment.
+
+### Dashboards
+- **Student Dashboard**: Tampilan agregat dari Course aktif/selesai, Progress terbaru, dan persentase penyelesaian.
+- **Instructor Dashboard**: Tampilan agregat dari statistik Course, Enrollment dari Student, dan tingkat penyelesaian secara keseluruhan.
+
+### Redis Integration
+- Pola Cache-aside untuk detail Course.
+- Penggunaan tipe data Sorted Sets untuk papan peringkat "Popular Courses" secara real-time.
+- Pelacakan riwayat (history) berbasis Session.
+
+### Celery Integration
+- Pemrosesan Background Task secara asinkron (misalnya, pemeliharaan latar belakang atau tugas Testing).
+
+### Monitoring
+- Dashboard Flower untuk memonitoring Celery Worker.
+- Endpoint Health Check untuk status Database, Redis, dan Celery.
+
+### Docker Deployment
+- Lingkungan containerized yang diorkestrasi menggunakan Docker Compose.
+
+### Documentation
+- Dokumentasi Swagger OpenAPI yang interaktif.
+- Koleksi Postman yang komprehensif.
+
+### Testing
+- Automated Testing untuk unit dan integrasi guna memverifikasi RBAC dan logika bisnis.
+
+### Demo Utilities
+- Perintah manajemen Django yang idempoten untuk melakukan Seed data demo.
+
+---
+
+# Feature Matrix
+
+| Fitur | Status |
+|----------|--------|
+| JWT Authentication | ✅ |
+| RBAC | ✅ |
+| Course CRUD | ✅ |
+| Lesson CRUD | ✅ |
+| Enrollment | ✅ |
+| Progress | ✅ |
+| Student Dashboard | ✅ |
+| Instructor Dashboard | ✅ |
+| Redis Cache | ✅ |
+| RabbitMQ | ✅ |
+| Celery | ✅ |
+| Flower | ✅ |
+| Health Check | ✅ |
+| Docker | ✅ |
+| Swagger | ✅ |
+| Postman | ✅ |
+
+---
+
+# Technology Stack
+
+| Komponen | Teknologi |
+|---|---|
+| **Core Framework** | Python 3.11, Django 5.2 |
+| **API Framework** | Django Ninja 1.1 |
+| **Authentication** | ninja-simple-jwt |
+| **Database** | PostgreSQL 15 |
+| **Cache & Session** | Redis 7 |
+| **Message Broker** | RabbitMQ 3 |
+| **Task Queue** | Celery & Flower |
+| **Containerization** | Docker & Docker Compose |
+
+---
+
+## Why These Technologies?
+
+| Teknologi | Fungsi |
+|------------|---------|
+| Django Ninja | REST API Framework |
+| PostgreSQL | Primary relational Database |
+| JWT | Stateless Authentication |
+| Redis | Cache and Session Storage |
+| RabbitMQ | Message Broker |
+| Celery | Background Task Processing |
+| Flower | Celery Monitoring Dashboard |
+| Docker Compose | Multi-container orchestration |
+
+---
+
+# System Architecture
+
+```mermaid
+flowchart LR
+    Client --> Swagger/Postman
+    Swagger/Postman --> DjangoNinja["Django Ninja"]
+    DjangoNinja --> JWT
+    JWT --> BusinessLogic["Business Logic"]
+    BusinessLogic --> PostgreSQL
+    BusinessLogic --> Redis
+    BusinessLogic --> CeleryWorker["Celery Worker"]
+    CeleryWorker --> RabbitMQ
+    RabbitMQ --> Flower
 ```
 
-Service utama:
+---
 
-| Service | Port | Keterangan |
-|---|---:|---|
-| `web` | `8000` | Django API |
-| `db` | `5432` | PostgreSQL |
-| `redis` | `6379` | Cache, session, leaderboard |
-| `rabbitmq` | `5672`, `15672` | Celery broker dan dashboard |
-| `celery_worker` | - | Worker async task |
-| `flower` | `5555` | Celery monitoring |
+# Project Structure
 
-## Environment Variables
+```text
+simple-lms/
+├── config/
+│   ├── settings.py
+│   ├── apiv1.py
+│   ├── urls.py
+│   └── celery.py
+├── lms/
+│   ├── models.py
+│   ├── tasks.py
+│   ├── tests.py
+│   ├── management/
+│   └── migrations/
+├── img/
+├── postman/
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+└── README.md
+```
 
-Buat file `.env` dari `.env.example`.
+- **`config/`**: Berisi konfigurasi inti project, pengaturan Django, API router, dan skema Pydantic.
+- **`lms/`**: Berisi logika bisnis aplikasi utama, model, tugas Celery, Automated Testing, dan perintah manajemen.
+- **`img/`**: Menyimpan tangkapan layar (screenshot) markdown yang digunakan dalam dokumentasi.
+- **`postman/`**: Menyimpan koleksi Postman yang diekspor untuk pengujian Endpoint secara manual.
 
+---
+
+# Installation
+
+### 1. Environment
+Salin contoh variabel environment:
 ```bash
 cp .env.example .env
 ```
 
-Contoh konfigurasi:
-
-```env
-DEBUG=True
-DB_NAME=lms_db
-DB_USER=postgres
-DB_PASSWORD=postgres
-DB_HOST=db
-DB_PORT=5432
+### 2. Docker
+Pastikan Docker Desktop sedang berjalan, lalu bangun dan jalankan semua layanan:
+```bash
+docker compose up --build -d
 ```
 
-Jangan commit `.env` karena berisi konfigurasi lokal.
-
-## Migration Steps
-
-Jalankan migration setelah container aktif:
-
+### 3. Migration
+Jalankan Migration Database awal:
 ```bash
 docker compose exec web python manage.py migrate
 ```
 
-Opsional, buat superuser untuk akses Django Admin:
-
-docker compose exec web python manage.py createsuperuser
-```
-
-Untuk memuat data awal (demo data), jalankan command berikut:
-
+### 4. Seed Demo
+Isi Database dengan data demo untuk pengguna, Course, dan Lesson:
 ```bash
 docker compose exec web python manage.py seed_demo
 ```
 
-API tersedia di:
-
-```text
-http://localhost:8000/api/
+### 5. Run Server
+Server berjalan secara otomatis melalui Docker pada port `8000`. Anda dapat memantau log dengan perintah:
+```bash
+docker compose logs -f web
 ```
 
-Swagger tersedia di:
+---
 
-```text
-http://localhost:8000/api/docs
+# API Documentation
+
+- **Swagger URL**: [http://localhost:8000/api/docs](http://localhost:8000/api/docs)
+- **OpenAPI URL**: [http://localhost:8000/api/openapi.json](http://localhost:8000/api/openapi.json)
+
+---
+
+# Authentication Flow
+
+```mermaid
+flowchart TD
+    Register --> Login
+    Login --> AccessToken["Access Token"]
+    AccessToken --> Authorize["Authorize (Bearer Token)"]
+    Authorize --> ProtectedEndpoint["Protected Endpoint"]
+    ProtectedEndpoint --> RefreshToken["Refresh Token (when expired)"]
 ```
 
-## Demo Accounts
+---
 
-Demo accounts dapat dibuat melalui Swagger atau Postman memakai endpoint `POST /api/auth/register`.
+# RBAC
 
-Gunakan data berikut untuk skenario demo:
+### Anonymous
+- Dapat melihat Endpoint API Health Check dan sapaan (hello).
+- Dapat melihat dan melakukan Search pada Course dan Lesson.
+- Dapat melihat detail Course dan Lesson.
+- Dapat melihat Popular Course dan riwayat kunjungan.
 
-| Role | Username | Password | Catatan |
-|---|---|---|---|
-| Admin | `admin1` | `password123` | Full access ke resource API |
-| Instructor | `instructor1` | `password123` | Kelola course dan lesson miliknya |
-| Student | `student1` | `password123` | Enroll course dan update progress |
+### Student
+- Mewarisi hak akses (Permission) Anonymous.
+- Dapat melakukan Enrollment pada Course.
+- Dapat melihat daftar Course yang di-Enrollment.
+- Dapat menandai Lesson sebagai selesai (hanya untuk Course yang di-Enrollment).
+- Dapat mengakses Student Dashboard.
+- Dapat melakukan Download pada Lesson Attachment.
 
-Contoh register:
+### Instructor
+- Mewarisi hak akses (Permission) baca dari Student.
+- Dapat membuat Course dan Lesson baru.
+- Dapat memperbarui, menghapus, dan melakukan Upload berkas **hanya untuk** Course dan Lesson milik mereka sendiri.
+- Dapat mengakses Instructor Dashboard untuk melihat statistik dari Course mereka.
 
-```json
-{
-  "username": "student1",
-  "password": "password123",
-  "role": "student"
-}
-```
+### Admin
+- Memiliki akses tak terbatas ke semua sumber daya.
+- Dapat memperbarui atau menghapus Course atau Lesson apa pun.
+- Dapat mengeksekusi tugas administratif (contoh: memicu tugas Celery untuk keperluan Testing).
 
-## Authentication
+---
 
-Login menggunakan:
+# Feature Demonstration
 
-```text
-POST /api/auth/sign-in
-```
+Kami merekomendasikan untuk mengikuti urutan berikut untuk merasakan seluruh kapabilitas API secara maksimal:
 
-Body:
+Register
 
-```json
-{
-  "username": "student1",
-  "password": "password123"
-}
-```
+↓
 
-Gunakan access token pada endpoint protected:
+Login
 
-```text
-Authorization: Bearer <access_token>
-```
+↓
 
-## Endpoint Summary
+Authorize
 
-### Authentication
+↓
 
-| Method | Endpoint | Auth | Keterangan |
-|---|---|---|---|
-| POST | `/api/auth/register` | Public | Register user |
-| POST | `/api/auth/sign-in` | Public | Login dan ambil JWT |
-| POST | `/api/auth/token-refresh` | Public | Refresh access token |
-| GET | `/api/auth/me` | JWT | Profil user login |
-| PUT | `/api/auth/me` | JWT | Update username |
+Create Course
 
-### Courses
+↓
 
-| Method | Endpoint | Auth / Role | Keterangan |
-|---|---|---|---|
-| GET | `/api/courses` | Public | List course dengan pagination, search, ordering |
-| GET | `/api/courses/popular` | Public | Top 10 popular courses dari Redis |
-| GET | `/api/courses/{course_id}` | Public | Detail course |
-| POST | `/api/courses` | Admin / Instructor | Buat course |
-| PATCH | `/api/courses/{course_id}` | Admin / Owner | Update course |
-| DELETE | `/api/courses/{course_id}` | Admin / Owner | Delete course |
-| POST | `/api/courses/{course_id}/upload-image` | Admin / Owner | Upload image course |
-| POST | `/api/courses/{course_id}/visit` | Public | Simpan visit history di session |
+Create Lesson
 
-### Lessons
+↓
 
-| Method | Endpoint | Auth / Role | Keterangan |
-|---|---|---|---|
-| GET | `/api/lessons` | Public | List lesson, optional `course_id` |
-| GET | `/api/lessons/{lesson_id}` | Public | Detail lesson |
-| POST | `/api/lessons` | Admin / Course Owner | Buat lesson |
-| PATCH | `/api/lessons/{lesson_id}` | Admin / Course Owner | Update lesson |
-| DELETE | `/api/lessons/{lesson_id}` | Admin / Course Owner | Delete lesson |
-| POST | `/api/lessons/{lesson_id}/upload-attachment` | Admin / Course Owner | Upload attachment |
-| GET | `/api/lessons/{lesson_id}/download` | Admin / Course Owner / Enrolled Student | Download attachment |
+Upload Attachment
 
-### Enrollments and Progress
+↓
 
-| Method | Endpoint | Auth / Role | Keterangan |
-|---|---|---|---|
-| POST | `/api/enrollments` | Student | Enroll ke course |
-| GET | `/api/enrollments/my-courses` | JWT | List course yang diikuti user |
-| POST | `/api/enrollments/{enrollment_id}/progress` | Student pemilik enrollment | Tandai lesson selesai |
+Enroll
 
-### General
+↓
 
-| Method | Endpoint | Auth / Role | Keterangan |
-|---|---|---|---|
-| GET | `/api/hello` | Public | API hello message sederhana |
-| GET | `/api/health` | Public | API health check mendetail |
-| GET | `/api/my-history` | Public session | Riwayat visit course |
-| POST | `/api/test-task` | Admin | Kirim Celery test task |
+Progress
 
-## RBAC Summary
+↓
 
-| Role | Hak Akses |
-|---|---|
-| Anonymous | Endpoint public saja |
-| Student | Lihat course/lesson, enroll, lihat course sendiri, update progress untuk lesson pada course yang di-enroll |
-| Instructor | Buat course, kelola course/lesson miliknya, upload file untuk resource miliknya |
-| Admin | Full access ke resource course/lesson dan task admin |
+Student Dashboard
 
-## How To Test With Swagger
+↓
 
-1. Buka `http://localhost:8000/api/docs`.
-2. Register user demo melalui `POST /api/auth/register`.
-3. Login melalui `POST /api/auth/sign-in`.
-4. Copy `access` token dari response.
-5. Klik tombol authorize di Swagger.
-6. Masukkan token dengan format:
+Instructor Dashboard
 
-```text
-Bearer <access_token>
-```
+↓
 
-7. Jalankan skenario:
-   - Instructor membuat course.
-   - Instructor membuat lesson pada course.
-   - Student enroll ke course.
-   - Student update progress lesson pada enrollment tersebut.
+Health Check
 
-## How To Test With Postman
+↓
 
-1. Import collection:
+Trigger Celery Task
 
-```text
-postman/simple-lms-advanced.postman_collection.json
-```
+↓
 
-2. Jalankan request register/login untuk role demo.
-3. Simpan access token dari login.
-4. Isi header Authorization pada request protected:
+Flower Monitoring
 
-```text
-Bearer <access_token>
-```
+*(Catatan: Menjalankan perintah `seed_demo` akan secara otomatis menangani langkah-langkah pembuatan data untuk Anda. Background Task dari Celery hanya akan muncul di Flower setelah sebuah tugas dipicu).*
 
-5. Jalankan urutan berikut:
-   - Register/login instructor.
-   - Create course.
-   - Create lesson.
-   - Register/login student.
-   - Enroll course.
-   - Mark lesson progress.
+---
 
-## Automated Tests
+# Docker Services
 
-Focused backend tests tersedia di `lms/tests.py`.
+- `web`: Aplikasi utama Django yang melayani REST API melalui Django Ninja pada port 8000.
+- `db`: Database PostgreSQL 15 yang menyimpan data aplikasi.
+- `redis`: Instance Redis 7 yang menangani Cache (detail Course), sesi, dan papan peringkat Popular Course.
+- `rabbitmq`: Message broker yang memfasilitasi komunikasi antara Django dan Celery.
+- `celery_worker`: Background Worker yang memproses tugas secara asinkron.
+- `flower`: Alat berbasis web untuk memantau dan mengelola kluster Celery, tersedia pada port 5555.
 
-Jalankan dengan:
+---
 
+# Running Tests
+
+Project ini menyertakan Automated Testing yang berfokus untuk memverifikasi RBAC, validasi Progress, dan logika CRUD inti.
+
+Jalankan suite Testing menggunakan perintah:
 ```bash
 docker compose exec web python manage.py test lms
 ```
 
-Coverage utama:
+---
 
-- RBAC course dan lesson
-- Lesson CRUD
-- Enrollment
-- Progress validation antar course
+# Screenshots
 
-## Screenshots
+Gambar-gambar berikut mendemonstrasikan sistem yang telah di-deploy.
 
-Beberapa screenshot pendukung tersedia di folder `img/`.
+## Swagger
+![Swagger](img/swagger.png)
 
-- Docker Compose: `img/docker-compose.png`
-- Swagger: `img/swagger.png`
-- Redis: `img/redis-ping.png`, `img/redis-monitor.png`, `img/redis-keys.png`
-- Popular courses: `img/popular-courses.png`
-- Query optimization: `img/query.png`
+## Student Dashboard
+![Student Dashboard](img/final/student-dashboard.png)
 
-## Author
+## Instructor Dashboard
+![Instructor Dashboard](img/final/instructor-dashboard.png)
 
-Nafis Aljufri
+## Docker Compose
+![Docker](img/docker-compose.png)
+
+## RabbitMQ
+![RabbitMQ](img/final/rabbitmq.png)
+
+## Flower
+![Flower](img/final/flower.png)
+
+## Health Check
+![Health](img/final/health.png)
+
+## Django Admin
+![Admin](img/final/admin.png)
+
+---
+
+# Future Improvements
+
+- **Cloud File Storage**: Memigrasi Upload media lokal (gambar dan Attachment) ke backend penyimpanan objek yang kompatibel dengan S3 menggunakan `django-storages` untuk skalabilitas horizontal.
+- **Nested Categories**: Memperluas API untuk mendukung dan menampilkan kategori Course bersarang (nested) secara penuh.
+- **Email Notifications**: Mengimplementasikan notifikasi email asinkron berbasis Celery untuk proses Enrollment dan penyelesaian Course yang sukses.
+
+---
+
+# Author
+  
+Muchamad Nafis Aljufri  
+Teknik Informatika  
+Universitas Dian Nuswantoro

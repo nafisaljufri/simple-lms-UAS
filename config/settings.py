@@ -171,3 +171,11 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 
 CELERY_TIMEZONE = "UTC"
+
+# ==========================
+# JWT CONFIGURATION
+# ==========================
+NINJA_SIMPLE_JWT = {
+    "JWT_PRIVATE_KEY_PATH": BASE_DIR / "jwt-signing.pem",
+    "JWT_PUBLIC_KEY_PATH": BASE_DIR / "jwt-signing.pub",
+}
